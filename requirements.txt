@@ -1,0 +1,6 @@
+Django==4.2.7
+# Add other potential dependencies based on your apps (e.g., for predictions):
+# scikit-learn==1.3.0
+# pandas==2.0.3
+# numpy==1.24.3
+# If using REST API: djangorestframework==3.14.0
