@@ -79,9 +79,9 @@ def importar_clientes(request):
                             if probabilidad_abandono > 1:
                                 probabilidad_abandono = 1.0
 
-                            if probabilidad_abandono < 0.3:
+                            if probabilidad_abandono < 0.33:
                                 nivel_riesgo = 'Bajo'
-                            elif probabilidad_abandono < 0.6:
+                            elif probabilidad_abandono < 0.66:
                                 nivel_riesgo = 'Medio'
                             else:
                                 nivel_riesgo = 'Alto'

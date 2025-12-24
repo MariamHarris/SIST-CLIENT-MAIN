@@ -7,6 +7,7 @@ from django.contrib.auth import get_user_model
 from django.contrib.auth.decorators import login_required
 from django.db import OperationalError
 from django.db import models
+from django.http import JsonResponse
 from django.shortcuts import render
 from django.utils import timezone
 
@@ -104,6 +105,44 @@ def ayuda(request):
 @login_required
 def reportes(request):
     return render(request, 'dashboard/reportes.html', {'page_title': 'Reportes'})
+
+
+@login_required
+def api_stats(request):
+    total_clientes = Cliente.objects.count()
+    total_activos = Cliente.objects.filter(estado='activo').count()
+    total_inactivos = Cliente.objects.filter(estado='inactivo').count()
+
+    riesgo_bajo = Cliente.objects.filter(nivel_riesgo='Bajo').count()
+    riesgo_medio = Cliente.objects.filter(nivel_riesgo='Medio').count()
+    riesgo_alto = Cliente.objects.filter(nivel_riesgo='Alto').count()
+
+    avg_prob = Cliente.objects.all().aggregate(avg=models.Avg('probabilidad_abandono'))['avg'] or 0.0
+    try:
+        avg_prob = float(avg_prob)
+    except (TypeError, ValueError):
+        avg_prob = 0.0
+
+    data = {
+        'resumen': {
+            'total_clientes': total_clientes,
+            'total_activos': total_activos,
+            'total_inactivos': total_inactivos,
+            'probabilidad_promedio_pct': round(avg_prob * 100.0, 2),
+        },
+        'distribuciones': {
+            'riesgo': {
+                'Bajo': riesgo_bajo,
+                'Medio': riesgo_medio,
+                'Alto': riesgo_alto,
+            },
+            'estado': {
+                'activo': total_activos,
+                'inactivo': total_inactivos,
+            },
+        },
+    }
+    return JsonResponse(data)
 
 
 # Backwards-compatible alias (si ya se estaba importando en otras partes)

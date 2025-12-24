@@ -68,7 +68,7 @@ def api_chat(request):
     def _prediction_explanation() -> str:
         return (
             "La predicción calcula una probabilidad de abandono (0% a 100%). "
-            "Luego se clasifica el riesgo: Bajo (<30%), Medio (30%–59%), Alto (≥60%)."
+            "Luego se clasifica el riesgo: Bajo (<33%), Medio (33%–66%), Alto (>66%)."
         )
 
     if Cliente is not None:
