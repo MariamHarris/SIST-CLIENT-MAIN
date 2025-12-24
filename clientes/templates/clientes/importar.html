@@ -1,0 +1,26 @@
+{% extends 'base.html' %}
+
+{% block content %}
+<div class="container-fluid">
+  <div class="d-flex justify-content-between align-items-center mb-3">
+    <div>
+      <h3 class="mb-0">Importar clientes</h3>
+      <small class="text-muted">Sube un archivo CSV o Excel</small>
+    </div>
+    <a class="btn btn-outline-secondary" href="{% url 'clientes:index' %}">Volver</a>
+  </div>
+
+  <div class="card">
+    <div class="card-body">
+      <form method="post" enctype="multipart/form-data">
+        {% csrf_token %}
+        <div class="mb-3">
+          <label class="form-label">Archivo</label>
+          <input class="form-control" type="file" name="archivo" accept=".csv,.xls,.xlsx" required>
+        </div>
+        <button class="btn btn-primary" type="submit">Importar</button>
+      </form>
+    </div>
+  </div>
+</div>
+{% endblock %}
