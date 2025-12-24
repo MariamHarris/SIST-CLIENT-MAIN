@@ -9,6 +9,15 @@
   <div class="card-body">
     <p class="text-muted">Página de predicciones (MVP). Selecciona un cliente para generar una predicción.</p>
 
+    {% if can_train %}
+      <div class="d-flex align-items-center gap-2 mb-3">
+        <button type="button" class="btn btn-outline-primary" id="btnEntrenarModelo" data-url="{% url 'predicciones:entrenar_modelo' %}">
+          Entrenar modelo
+        </button>
+        <small class="text-muted">(Requiere que existan clientes inactivos para poder entrenar)</small>
+      </div>
+    {% endif %}
+
     <div id="prediccion-alert" class="alert d-none" role="alert"></div>
 
     <div class="table-responsive">
@@ -49,6 +58,7 @@
   (function () {
     const alertEl = document.getElementById('prediccion-alert');
     const buttons = document.querySelectorAll('.btn-predecir');
+    const trainBtn = document.getElementById('btnEntrenarModelo');
 
     function showAlert(kind, text) {
       alertEl.classList.remove('d-none', 'alert-success', 'alert-danger', 'alert-warning', 'alert-info');
@@ -82,6 +92,32 @@
         }
       });
     });
+
+    if (trainBtn) {
+      trainBtn.addEventListener('click', async () => {
+        const url = trainBtn.getAttribute('data-url');
+        if (!url) return;
+
+        trainBtn.disabled = true;
+        try {
+          const res = await fetch(url, { headers: { 'X-Requested-With': 'XMLHttpRequest' } });
+          const data = await res.json();
+
+          if (!res.ok) {
+            showAlert('danger', data.error || 'No se pudo entrenar el modelo');
+            return;
+          }
+
+          const acc = (typeof data.accuracy === 'number') ? (data.accuracy * 100).toFixed(2) : 'N/A';
+          const roc = (typeof data.roc_auc === 'number') ? data.roc_auc.toFixed(3) : 'N/A';
+          showAlert('success', `Modelo entrenado. Accuracy: ${acc}% · ROC AUC: ${roc}`);
+        } catch (e) {
+          showAlert('danger', 'Error de red al entrenar el modelo');
+        } finally {
+          trainBtn.disabled = false;
+        }
+      });
+    }
   })();
 </script>
 {% endblock %}

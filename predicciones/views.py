@@ -8,7 +8,17 @@ from clientes.models import Cliente
 @login_required
 def home(request):
     clientes = Cliente.objects.all().order_by('id')[:200]
-    return render(request, 'predicciones/inicio.html', {'clientes': clientes})
+    can_train = bool(getattr(request.user, 'is_superuser', False) or getattr(request.user, 'rol', None) == 'admin')
+    return render(
+        request,
+        'predicciones/inicio.html',
+        {
+            'clientes': clientes,
+            'can_train': can_train,
+            'page_title': 'Predicciones',
+            'page_subtitle': 'Selecciona un cliente para analizar riesgo',
+        },
+    )
 
 @login_required
 def entrenar_modelo(request):

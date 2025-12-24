@@ -1,5 +1,5 @@
 # Requisitos
-- Python 3.x
+- Python 3.x (recomendado 3.11+)
 
 # Instalación (Windows)
 1) Clonar el repo
@@ -24,6 +24,17 @@
 # Levantar el servidor
 - Local:
   - `python manage.py runserver`
+
+# Flujo recomendado (MUST HAVE)
+1) Importar clientes
+  - Menú: Clientes → Importar
+  - Formatos: CSV o Excel
+2) Entrenar el modelo (solo admin)
+  - Menú: Predicciones → botón "Entrenar modelo"
+  - Nota: para entrenar, deben existir clientes con `estado=inactivo` (si no, el endpoint avisa).
+3) Predecir por cliente
+  - Menú: Predicciones → botón "Predecir" en la fila del cliente
+  - Resultado: muestra probabilidad (%) y nivel (Bajo/Medio/Alto) y lo guarda en el cliente.
 
 - En red (para acceder desde otra PC en la misma LAN):
   1) `python manage.py runserver 0.0.0.0:8000`
