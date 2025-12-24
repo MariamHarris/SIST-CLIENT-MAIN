@@ -44,6 +44,9 @@ INSTALLED_APPS = [
     'chatbot',
 ]
 
+#modelo usuario
+AUTH_USER_MODEL = 'usuarios.Usuario'
+
 MIDDLEWARE = [
     'django.middleware.security.SecurityMiddleware',
     'django.contrib.sessions.middleware.SessionMiddleware',
@@ -59,7 +62,7 @@ ROOT_URLCONF = 'sist_pred_client.urls'
 TEMPLATES = [
     {
         'BACKEND': 'django.template.backends.django.DjangoTemplates',
-        'DIRS': [BASE_DIR / 'sist_pred_client' / 'templates'],
+        'DIRS': [BASE_DIR / 'templates'],
         'APP_DIRS': True,
         'OPTIONS': {
             'context_processors': [
@@ -70,6 +73,14 @@ TEMPLATES = [
         },
     },
 ]
+
+
+# Redirección cuando el usuario no está autenticado
+LOGIN_URL = 'usuarios:login'
+# Redirección después de cerrar sesión
+LOGOUT_REDIRECT_URL = 'usuarios:login'
+
+
 
 WSGI_APPLICATION = 'sist_pred_client.wsgi.application'
 
@@ -121,7 +132,13 @@ USE_TZ = True
 
 STATIC_URL = 'static/'
 
+# Priorizar estáticos del proyecto (evita colisiones con apps, ej: predicciones/static/css/style.css)
+STATICFILES_DIRS = [
+    BASE_DIR / 'sist_pred_client' / 'static',
+]
+
 # Default primary key field type
 # https://docs.djangoproject.com/en/5.2/ref/settings/#default-auto-field
 
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
+

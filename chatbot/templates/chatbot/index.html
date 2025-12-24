@@ -1,6 +1,14 @@
 {% extends "base.html" %}
 {% block title %}Chatbot{% endblock %}
 {% block content %}
-    <h2>Chatbot</h2>
-    <p>Interfaz del chatbot.</p>
+    <div class="chatbot-section">
+        <h2>Chatbot</h2>
+        <div class="chatbot-container">
+            <div class="chat-messages">
+                <p><strong>Bot:</strong> ¡Hola! ¿En qué puedo ayudarte?</p>
+            </div>
+            <input type="text" placeholder="Escribe tu mensaje..." class="chat-input">
+            <button class="chat-send">Enviar</button>
+        </div>
+    </div>
 {% endblock %}

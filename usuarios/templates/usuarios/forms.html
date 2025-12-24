@@ -1,0 +1,48 @@
+{% extends 'base.html' %}
+
+{% block title %}Usuario{% endblock %}
+{% block page_title %}Usuario{% endblock %}
+{% block page_subtitle %}Crear / editar{% endblock %}
+
+{% block content %}
+<div class="max-w-xl">
+    <form method="post" class="bg-white rounded-lg border border-gray-200 p-4" id="usuarioForm">
+        {% csrf_token %}
+
+        <div class="space-y-3">
+            {{ form.as_p }}
+        </div>
+
+        <div class="mt-4 flex items-center gap-2">
+            <button type="submit" class="px-4 py-2 rounded bg-green-600 text-white text-sm">Guardar</button>
+            <a href="{% url 'usuarios:listar' %}" class="px-4 py-2 rounded bg-gray-100 text-gray-800 text-sm">Cancelar</a>
+        </div>
+    </form>
+</div>
+
+<script>
+    // Validaciones simples de UI (la validación real está en Django)
+    (function () {
+        const form = document.getElementById('usuarioForm');
+        if (!form) return;
+
+        form.addEventListener('submit', function (e) {
+            const emailEl = document.getElementById('id_email');
+            const passEl = document.getElementById('id_password');
+            const email = emailEl ? emailEl.value : '';
+            const password = passEl ? passEl.value : '';
+
+            if (email && !/^[^@]+@[^@]+\.[a-zA-Z]{2,}$/.test(email)) {
+                alert('Introduce un correo válido');
+                e.preventDefault();
+                return;
+            }
+
+            if (password && (password.length < 8 || !/[A-Z]/.test(password) || !/\d/.test(password))) {
+                alert('La contraseña debe tener al menos 8 caracteres, una mayúscula y un número.');
+                e.preventDefault();
+            }
+        });
+    })();
+</script>
+{% endblock %}

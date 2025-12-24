@@ -1,0 +1,31 @@
+{% extends 'base.html' %}
+
+{% block title %}Eliminar usuario{% endblock %}
+{% block page_title %}Eliminar usuario{% endblock %}
+{% block page_subtitle %}Acción irreversible{% endblock %}
+
+{% block content %}
+<div class="max-w-xl bg-white rounded-lg border border-gray-200 p-4">
+    <p class="text-sm text-gray-700">¿Eliminar usuario <strong>{{ object.username }}</strong>?</p>
+
+    <form method="post" class="mt-4" id="deleteForm">
+        {% csrf_token %}
+        <div class="flex items-center gap-2">
+            <button class="px-4 py-2 rounded bg-red-600 text-white text-sm" type="submit">Sí, eliminar</button>
+            <a href="{% url 'usuarios:listar' %}" class="px-4 py-2 rounded bg-gray-100 text-gray-800 text-sm">Cancelar</a>
+        </div>
+    </form>
+</div>
+
+<script>
+    (function () {
+        const f = document.getElementById('deleteForm');
+        if (!f) return;
+        f.addEventListener('submit', function (e) {
+            if (!confirm('¿Confirmas eliminar este usuario?')) {
+                e.preventDefault();
+            }
+        });
+    })();
+</script>
+{% endblock %}
