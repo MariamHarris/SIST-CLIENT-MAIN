@@ -1,0 +1,38 @@
+{% extends 'base.html' %}
+
+{% block title %}Predicciones{% endblock %}
+{% block page_title %}{{ page_title|default:'Predicciones' }}{% endblock %}
+{% block page_subtitle %}{{ page_subtitle|default:'Selecciona un cliente para analizar riesgo' }}{% endblock %}
+
+{% block content %}
+<div class="card">
+  <div class="card-body">
+    <p class="text-muted">Página de predicciones (MVP). Selecciona un cliente para generar una predicción.</p>
+
+    <div class="table-responsive">
+      <table class="table table-striped mb-0">
+        <thead>
+          <tr>
+            <th>Cliente</th>
+            <th>Email</th>
+            <th class="text-end">Acción</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for c in clientes %}
+            <tr>
+              <td>{{ c.nombre }} {{ c.apellido }}</td>
+              <td>{{ c.email }}</td>
+              <td class="text-end">
+                <a class="btn btn-sm btn-primary" href="#">Predecir</a>
+              </td>
+            </tr>
+          {% empty %}
+            <tr><td colspan="3" class="text-center text-muted py-4">No hay clientes para predecir</td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+{% endblock %}
