@@ -1,0 +1,25 @@
+{% extends "dashboard/base.html" %}
+{% block extra_js %}
+<script src="https://cdn.plot.ly/plotly-latest.min.js"></script>
+{% endblock %}
+{% block page_title %}Evaluación del modelo{% endblock %}
+{% block content %}
+<div class="row g-3">
+    <div class="col-md-4">
+        <div class="card p-3">
+            <h6>Precision</h6><p class="h4">{{ precision }}</p>
+            <h6>Recall</h6><p class="h4">{{ recall }}</p>
+            <h6>F1</h6><p class="h4">{{ f1 }}</p>
+            <h6>AUC</h6><p class="h4">{{ roc_auc }}</p>
+        </div>
+    </div>
+    <div class="col-md-8">
+        <div class="card p-3 mb-3">
+            {{ cm_div|safe }}
+        </div>
+        <div class="card p-3">
+            {{ roc_div|safe }}
+        </div>
+    </div>
+</div>
+{% endblock %}

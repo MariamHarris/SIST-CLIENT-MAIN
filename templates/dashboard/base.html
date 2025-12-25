@@ -1,0 +1,192 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="es">
+<head>
+	<meta charset="UTF-8">
+	<meta name="viewport" content="width=device-width, initial-scale=1.0">
+	<meta name="description" content="Sistema de Predicción de Abandono de Clientes (Churn)">
+	<title>{% block title %}ChurnPredict Pro{% endblock %}</title>
+	<link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+	<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+	<link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700&family=Inter:wght@300;400;500;600&display=swap" rel="stylesheet">
+	<link rel="stylesheet" href="{% static 'css/style.css' %}">
+	{% block extra_css %}{% endblock %}
+</head>
+<body>
+	<div class="layout-wrapper">
+		<aside class="sidebar">
+			<div class="sidebar-header">
+				<a href="{% url 'dashboard:inicio' %}" class="brand">
+					<div class="brand-icon"><i class="fas fa-brain"></i></div>
+					<div class="brand-text">
+						<span class="brand-title">ChurnPredict</span>
+						<span class="brand-subtitle">AI System</span>
+					</div>
+				</a>
+				<button class="sidebar-toggle" id="sidebarToggle"><i class="fas fa-bars"></i></button>
+			</div>
+			<div class="sidebar-menu">
+				<ul class="nav flex-column">
+					<li class="nav-item">
+						<a href="{% url 'dashboard:inicio' %}" class="nav-link {% if request.resolver_match.view_name == 'dashboard:inicio' %}active{% endif %}">
+							<i class="fas fa-tachometer-alt"></i><span>Dashboard</span>
+						</a>
+					</li>
+					<li class="nav-item">
+						<a href="{% url 'clientes:index' %}" class="nav-link {% if request.resolver_match.app_name == 'clientes' %}active{% endif %}">
+							<i class="fas fa-users"></i><span>Clientes</span>
+							<span class="badge bg-danger ms-auto" id="clientes-alerta">{{ clientes_alerta|default:0 }}</span>
+						</a>
+					</li>
+					<li class="nav-item">
+						<a href="{% url 'predicciones:index' %}" class="nav-link {% if request.resolver_match.app_name == 'predicciones' %}active{% endif %}">
+							<i class="fas fa-chart-line"></i><span>Predicciones</span>
+						</a>
+					</li>
+					<li class="nav-item">
+						<a href="{% url 'chatbot:index' %}" class="nav-link {% if request.resolver_match.app_name == 'chatbot' %}active{% endif %}">
+							<i class="fas fa-robot"></i><span>Chatbot IA</span><span class="badge bg-success ms-auto">Nuevo</span>
+						</a>
+					</li>
+					<li class="nav-item">
+						<a href="{% url 'usuarios:index' %}" class="nav-link {% if request.resolver_match.app_name == 'usuarios' %}active{% endif %}">
+							<i class="fas fa-user-cog"></i><span>Usuarios</span>
+						</a>
+					</li>
+				</ul>
+				<div class="sidebar-divider"></div>
+				<ul class="nav flex-column">
+					<li class="nav-item">
+						<a href="{% url 'dashboard:configuracion' %}" class="nav-link {% if request.resolver_match.view_name == 'dashboard:configuracion' %}active{% endif %}"><i class="fas fa-cog"></i><span>Configuración</span></a>
+					</li>
+					<li class="nav-item">
+						<a href="{% url 'dashboard:ayuda' %}" class="nav-link {% if request.resolver_match.view_name == 'dashboard:ayuda' %}active{% endif %}"><i class="fas fa-question-circle"></i><span>Ayuda</span></a>
+					</li>
+					<li class="nav-item">
+						<a href="{% url 'dashboard:reportes' %}" class="nav-link {% if request.resolver_match.view_name == 'dashboard:reportes' %}active{% endif %}"><i class="fas fa-file-export"></i><span>Reportes</span></a>
+					</li>
+				</ul>
+			</div>
+			<div class="sidebar-footer">
+				<div class="user-profile">
+					<div class="user-avatar">
+						{% if user.is_authenticated %}
+							<span class="avatar-initials">{{ user.username|slice:":2"|upper }}</span>
+						{% else %}
+							<i class="fas fa-user"></i>
+						{% endif %}
+					</div>
+					<div class="user-info">
+						<span class="user-name">{% if user.is_authenticated %}{{ user.username }}{% else %}Invitado{% endif %}</span>
+						<span class="user-role">
+							{% if user.is_authenticated %}
+								{% if user.is_superuser %}Admin{% elif user.is_staff %}Staff{% else %}Usuario{% endif %}
+							{% else %}No autenticado{% endif %}
+						</span>
+					</div>
+					{% if user.is_authenticated %}
+						<a href="{% url 'logout' %}" class="logout-btn" title="Cerrar sesión"><i class="fas fa-sign-out-alt"></i></a>
+					{% else %}
+						<a href="{% url 'login' %}" class="logout-btn" title="Iniciar sesión"><i class="fas fa-sign-in-alt"></i></a>
+					{% endif %}
+				</div>
+			</div>
+		</aside>
+
+		<div class="main-content">
+			<header class="topbar">
+				<div class="container-fluid">
+					<div class="row align-items-center">
+						<div class="col-md-6">
+							<h1 class="page-title">{% block page_title %}Dashboard{% endblock %}</h1>
+							<p class="page-subtitle">{% block page_subtitle %}Sistema de predicción de abandono de clientes{% endblock %}</p>
+						</div>
+						<div class="col-md-6">
+							<div class="topbar-actions">
+								<div class="dropdown">
+									<button class="btn btn-notification" type="button" data-bs-toggle="dropdown"><i class="fas fa-bell"></i><span class="notification-badge">3</span></button>
+									<div class="dropdown-menu dropdown-menu-end">
+										<h6 class="dropdown-header">Notificaciones</h6>
+										<a class="dropdown-item" href="#">
+											<div class="notification-item">
+												<i class="fas fa-exclamation-triangle text-warning"></i>
+												<div class="notification-content">
+													<div class="notification-title">Alto riesgo detectado</div>
+													<div class="notification-time">Hace 5 minutos</div>
+												</div>
+											</div>
+										</a>
+										<div class="dropdown-divider"></div>
+										<a class="dropdown-item text-center" href="#">Ver todas</a>
+									</div>
+								</div>
+								<div class="search-box">
+									<input type="text" class="form-control" placeholder="Buscar...">
+									<button class="search-btn"><i class="fas fa-search"></i></button>
+								</div>
+								<div class="date-display"><i class="far fa-calendar"></i><span id="current-date"></span></div>
+							</div>
+						</div>
+					</div>
+				</div>
+			</header>
+
+			{% if messages %}
+			<div class="container-fluid mt-3">
+				{% for message in messages %}
+				<div class="alert alert-{{ message.tags }} alert-dismissible fade show" role="alert">
+					<div class="d-flex align-items-center">
+						<i class="fas 
+							{% if message.tags == 'success' %}fa-check-circle{% endif %}
+							{% if message.tags == 'error' or message.tags == 'danger' %}fa-exclamation-circle{% endif %}
+							{% if message.tags == 'warning' %}fa-exclamation-triangle{% endif %}
+							{% if message.tags == 'info' %}fa-info-circle{% endif %} me-2"></i>
+						<div>{{ message }}</div>
+					</div>
+					<button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+				</div>
+				{% endfor %}
+			</div>
+			{% endif %}
+
+			<main class="content">
+				<div class="container-fluid">
+					{% block content %}{% endblock %}
+				</div>
+			</main>
+
+			<footer class="footer">
+				<div class="container-fluid">
+					<div class="row">
+						<div class="col-md-6">
+							<span class="footer-text"><strong>ChurnPredict Pro</strong> v1.0.0 © {% now "Y" %}</span>
+						</div>
+						<div class="col-md-6 text-end">
+							<span class="footer-stats"><i class="fas fa-server"></i> <span id="system-stats">{{ system_stats }}</span></span>
+						</div>
+					</div>
+				</div>
+			</footer>
+		</div>
+	</div>
+
+	<div class="modal fade" id="loadingModal" data-bs-backdrop="static" tabindex="-1">
+		<div class="modal-dialog modal-dialog-centered">
+			<div class="modal-content">
+				<div class="modal-body text-center">
+					<div class="spinner-border text-primary" role="status"><span class="visually-hidden">Cargando...</span></div>
+					<p class="mt-3">Procesando solicitud...</p>
+				</div>
+			</div>
+		</div>
+	</div>
+
+	<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+	<script src="{% static 'js/main.js' %}"></script>
+	{% block extra_js %}{% endblock %}
+
+	<style>
+		/* ...optimised CSS truncated for brevity; keep your existing embedded styles or move to static/css/style.css... */
+	</style>
+</body>
+</html>

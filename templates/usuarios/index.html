@@ -1,0 +1,175 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Clientes — Dashboard</title>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
+  <style>
+    body { background:#f6f8fb; }
+    .card-stats { min-height:120px; }
+    .chart-wrapper { height:320px; }
+    .text-truncate-200 { max-width:200px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  </style>
+</head>
+<body>
+<nav class="navbar navbar-expand-lg navbar-dark bg-primary">
+  <div class="container-fluid">
+    <a class="navbar-brand" href="#">SIST - Clientes</a>
+    <div>
+      <a class="btn btn-light btn-sm" href="{% url 'usuarios:export_clients_csv' %}">Exportar CSV</a>
+    </div>
+  </div>
+</nav>
+
+<main class="container my-4">
+  <div class="row g-3 mb-3">
+    <div class="col-md-4">
+      <div class="card card-stats">
+        <div class="card-body">
+          <small class="text-muted">Total clientes</small>
+          <h3 class="mt-2">{{ total_clients }}</h3>
+        </div>
+      </div>
+    </div>
+    <div class="col-md-4">
+      <div class="card card-stats">
+        <div class="card-body">
+          <small class="text-muted">Churn promedio estimado</small>
+          <h3 class="mt-2">{{ avg_churn }}%</h3>
+          <div class="progress mt-2" style="height:10px;">
+            <div class="progress-bar bg-warning" role="progressbar" style="width: {{ avg_churn }}%"></div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="col-md-4 d-flex align-items-stretch">
+      <div class="card w-100">
+        <div class="card-body">
+          <small class="text-muted">Acciones rápidas</small>
+          <p class="mb-2">Prioriza exportar CSV, gráficos y alertas.</p>
+          <a class="btn btn-outline-primary btn-sm" href="{% url 'usuarios:index' %}">Ir al dashboard</a>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="row mb-4">
+    <div class="col-lg-7">
+      <div class="card">
+        <div class="card-header">Distribución de probabilidad de churn</div>
+        <div class="card-body chart-wrapper">
+          <canvas id="churnChart"></canvas>
+        </div>
+      </div>
+    </div>
+
+    <div class="col-lg-5">
+      <div class="card">
+        <div class="card-header">Clientes</div>
+        <div class="card-body p-0">
+          <div class="table-responsive">
+            <table class="table mb-0">
+              <thead class="table-light">
+                <tr><th style="width:7%">ID</th><th>Nombre</th><th>Email</th><th style="width:18%">Acciones</th></tr>
+              </thead>
+              <tbody>
+                {% for c in clientes %}
+                <tr>
+                  <td>{{ c.id }}</td>
+                  <td class="text-truncate-200">{{ c.nombre }}</td>
+                  <td class="text-truncate-200">{{ c.email }}</td>
+                  <td>
+                    <button class="btn btn-sm btn-success predict-btn" data-id="{{ c.id }}" data-nombre="{{ c.nombre }}">Predecir</button>
+                    <a class="btn btn-sm btn-secondary" href="#" onclick="alert('Ficha no implementada');return false;">Ver</a>
+                  </td>
+                </tr>
+                {% empty %}
+                <tr><td colspan="4" class="text-center py-4">No hay clientes.</td></tr>
+                {% endfor %}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <footer class="text-muted small">MVP — reemplaza la heurística por modelo ML para producción.</footer>
+</main>
+
+<!-- Modal -->
+<div class="modal fade" id="predModal" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <div class="modal-header"><h5 class="modal-title">Predicción</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
+      <div class="modal-body">
+        <p id="predCliente" class="fw-semibold"></p>
+        <div class="progress mb-2" style="height:22px;"><div id="predBar" class="progress-bar" role="progressbar" style="width:0%">0%</div></div>
+        <p id="predAdvice" class="text-muted"></p>
+      </div>
+      <div class="modal-footer"><button class="btn btn-secondary" data-bs-dismiss="modal">Cerrar</button></div>
+    </div>
+  </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+<script>
+  // Chart.js data from server
+  const chartLabels = {{ chart_labels|safe }};
+  const chartData = {{ chart_data|safe }};
+
+  const ctx = document.getElementById('churnChart').getContext('2d');
+  const churnChart = new Chart(ctx, {
+    type: 'bar',
+    data: {
+      labels: chartLabels,
+      datasets: [{
+        label: 'Probabilidad de churn (%)',
+        data: chartData,
+        backgroundColor: chartData.map(v => v < 30 ? 'rgba(40,167,69,0.8)' : (v < 70 ? 'rgba(255,193,7,0.85)' : 'rgba(220,53,69,0.9)')),
+        borderRadius: 6
+      }]
+    },
+    options: {
+      responsive: true,
+      plugins: { legend: { display:false } },
+      scales: { y: { beginAtZero: true, max: 100 } }
+    }
+  });
+
+  // CSRF helper
+  function getCookie(name){
+    const v = document.cookie.match('(^|;)\\s*' + name + '\\s*=\\s*([^;]+)');
+    return v ? v.pop() : '';
+  }
+
+  (function(){
+    const predModal = new bootstrap.Modal(document.getElementById('predModal'));
+    document.querySelectorAll('.predict-btn').forEach(btn => {
+      btn.addEventListener('click', async () => {
+        const id = btn.dataset.id;
+        const nombre = btn.dataset.nombre || 'Cliente';
+        try {
+          const res = await fetch(`/usuarios/predict/${id}/`, { credentials: 'same-origin', headers: {'X-CSRFToken': getCookie('csrftoken')}});
+          if (!res.ok) throw new Error('Respuesta no OK');
+          const data = await res.json();
+          const percent = data.percent ?? Math.round((data.probability || 0) * 10000)/100;
+          const bar = document.getElementById('predBar');
+          bar.style.width = percent + '%';
+          bar.textContent = percent + '%';
+          bar.classList.remove('bg-success','bg-warning','bg-danger');
+          if (percent < 30) bar.classList.add('bg-success');
+          else if (percent < 70) bar.classList.add('bg-warning');
+          else bar.classList.add('bg-danger');
+          document.getElementById('predCliente').textContent = `${nombre} — ${percent}%`;
+          document.getElementById('predAdvice').textContent = percent >= 70 ? 'Prioridad alta: ejecutar retención.' : (percent >= 30 ? 'Monitorizar y aplicar campaña.' : 'Riesgo bajo.');
+          predModal.show();
+        } catch (err) { alert('Error al predecir: ' + err); }
+      });
+    });
+  })();
+</script>
+</body>
+</html>

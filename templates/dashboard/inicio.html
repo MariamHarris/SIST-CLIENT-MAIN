@@ -1,0 +1,44 @@
+{% extends "dashboard/base.html" %}
+{% block title %}Dashboard — ChurnPredict Pro{% endblock %}
+{% block page_title %}Resumen{% endblock %}
+{% block page_subtitle %}Estado actual del sistema{% endblock %}
+
+{% block content %}
+<div class="row g-3">
+	<div class="col-md-4">
+		<div class="card p-3">
+			<h6 class="mb-1">Clientes totales</h6>
+			<p class="h3 mb-0">{{ total_clientes }}</p>
+		</div>
+	</div>
+	<div class="col-md-4">
+		<div class="card p-3">
+			<h6 class="mb-1">Usuarios activos</h6>
+			<p class="h3 mb-0">{{ total_usuarios_activos }}</p>
+		</div>
+	</div>
+	<div class="col-md-4">
+		<div class="card p-3">
+			<h6 class="mb-1">Predicciones</h6>
+			<p class="h3 mb-0">{% if total_predicciones is not None %}{{ total_predicciones }}{% else %}N/A{% endif %}</p>
+		</div>
+	</div>
+</div>
+
+<div class="mt-4">
+	<h5>Últimas predicciones</h5>
+	<ul class="list-group">
+		{% for p in ultimas_predicciones %}
+		<li class="list-group-item d-flex justify-content-between align-items-center">
+			<div>
+				<strong>{{ p.cliente.nombre }}</strong><br>
+				<small class="text-muted">{{ p.algoritmo_usado }} — {{ p.fecha_prediccion }}</small>
+			</div>
+			<span class="badge bg-{{ 'danger' if p.nivel_riesgo|lower == 'alto' else 'warning' if p.nivel_riesgo|lower == 'medio' else 'success' }}">{{ p.nivel_riesgo }}</span>
+		</li>
+		{% empty %}
+		<li class="list-group-item">Sin predicciones recientes.</li>
+		{% endfor %}
+	</ul>
+</div>
+{% endblock %}

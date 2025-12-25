@@ -1,0 +1,22 @@
+<div id="alerts-widget" class="relative">
+  <button id="alerts-toggle" class="px-2 py-1 bg-red-600 text-white rounded">Alertas <span id="alerts-count" class="font-bold">0</span></button>
+  <div id="alerts-menu" class="hidden absolute right-0 mt-2 w-80 bg-white shadow rounded">
+    <div id="alerts-list" class="p-2"></div>
+  </div>
+</div>
+
+<script>
+async function refreshAlerts(){
+  try{
+    const res = await fetch('/usuarios/alerts/api/', { credentials: 'same-origin' });
+    const json = await res.json();
+    const list = json.alerts || [];
+    document.getElementById('alerts-count').textContent = list.length;
+    const container = document.getElementById('alerts-list');
+    container.innerHTML = list.map(a => `<div class="border-b p-2"><strong>${a.cliente}</strong><div>${(a.probability*100).toFixed(2)}%</div><small class="text-xs text-gray-500">${a.created_at}</small></div>`).join('') || '<div class="p-2 text-sm text-gray-500">Sin alertas</div>';
+  }catch(e){ console.warn(e); }
+}
+document.getElementById('alerts-toggle').addEventListener('click', ()=>{ document.getElementById('alerts-menu').classList.toggle('hidden'); });
+refreshAlerts();
+setInterval(refreshAlerts, 30000); // refrescar cada 30s
+</script>
