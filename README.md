@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 # Requisitos
 - Python 3.x
 
@@ -29,3 +30,13 @@
   1) `python manage.py runserver 0.0.0.0:8000`
   2) En tu `.env`, agrega el IP del servidor a `DJANGO_ALLOWED_HOSTS`
 	  - Ejemplo: `DJANGO_ALLOWED_HOSTS=localhost,127.0.0.1,192.168.1.50`
+=======
+\# SIST-CLIENT-MAIN
+
+git clone https://github.com/02yari/sist-client.git
+Crear entorno virtual: python -m venv venv, venv\Scripts\activate
+Instalar dependencias: pip install -r requirements.txt
+Configurar base de dato: python manage.py migrate
+crear super usuario: python manage.py createsuperuser
+Servidor: python manage.py runserver
+>>>>>>> 61a4870709e828be113181965858ae3a9ca7d797
