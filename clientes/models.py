@@ -18,6 +18,12 @@ class Cliente(models.Model):
     fecha_registro = models.DateField(auto_now_add=True)
     nivel_riesgo = models.DecimalField(max_digits=5, decimal_places=2, default=0.0)
 
+    probabilidad_abandono = models.FloatField(
+        null=True,
+        blank=True,
+        help_text="Probabilidad (%) de que el cliente abandone"
+    )
+
     def __str__(self):
         return f"{self.nombre} {self.apellido} ({self.email})"
 

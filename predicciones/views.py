@@ -1,7 +1,6 @@
 from django.contrib.auth.decorators import login_required
 from django.http import HttpResponseForbidden, JsonResponse
-from django.shortcuts import render
-
+from django.shortcuts import render, redirect
 from clientes.models import Cliente
 
 
@@ -73,12 +72,13 @@ def entrenar_modelo(request):
         'report': report
     })
 
-
 @login_required
 def predecir_abandono(request, cliente_id):
+    # Permisos
     if not request.user.is_superuser and getattr(request.user, 'rol', None) not in {'admin', 'analista'}:
         return HttpResponseForbidden("No tienes permiso para hacer predicciones")
 
+    # Dependencias ML
     try:
         import pandas as pd
         import joblib
@@ -90,42 +90,52 @@ def predecir_abandono(request, cliente_id):
             },
             status=500,
         )
-    
+
+    # Cliente
     try:
         cliente = Cliente.objects.get(id=cliente_id)
     except Cliente.DoesNotExist:
         return JsonResponse({'error': 'Cliente no encontrado'}, status=404)
 
-    # Cargar modelo
+    # Modelo
     try:
         modelo = joblib.load('predicciones/modelo_cliente.pkl')
     except FileNotFoundError:
         return JsonResponse({'error': 'Modelo no entrenado'}, status=400)
 
-    # Preparar datos del cliente como dataframe
+    # DataFrame
     df = pd.DataFrame([{
         'telefono': cliente.telefono,
         'estado': cliente.estado,
-        'nivel_riesgo': cliente.nivel_riesgo,
+        'nivel_riesgo': float(cliente.nivel_riesgo),
     }])
 
-    # Convertir variables categóricas igual que en entrenamiento
-    df = pd.get_dummies(df, columns=['estado', 'nivel_riesgo'], drop_first=True)
+    df = pd.get_dummies(df, columns=['estado'], drop_first=True)
 
-    # Asegurarse que las columnas coincidan con el modelo
-    modelo_cols = modelo.feature_names_in_
-    for col in modelo_cols:
+    # Alinear columnas con el modelo
+    for col in modelo.feature_names_in_:
         if col not in df.columns:
             df[col] = 0
-    df = df[modelo_cols]
+    df = df[modelo.feature_names_in_]
 
-    # Hacer predicción
-    probabilidad = modelo.predict_proba(df)[:, 1][0]
+    # Predicción
+    probabilidad = float(modelo.predict_proba(df)[:, 1][0]) * 100
 
-    return JsonResponse({
-        'cliente': cliente.nombre,
-        'probabilidad_abandono': round(probabilidad * 100, 2)
-    })
+    # GUARDAR RESULTADOS (ESTO ES LA CLAVE)
+    cliente.probabilidad_abandono = round(probabilidad, 2)
+
+    # Nivel de riesgo simple
+    if probabilidad >= 70:
+        cliente.nivel_riesgo = 3
+    elif probabilidad >= 40:
+        cliente.nivel_riesgo = 2
+    else:
+        cliente.nivel_riesgo = 1
+
+    cliente.save()
+
+    # Volver al dashboard (NO JSON)
+    return redirect('dashboard:inicio')
 
 @login_required
 def calcular_nivel_riesgo(request, cliente_id):

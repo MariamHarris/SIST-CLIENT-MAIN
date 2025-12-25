@@ -24,7 +24,7 @@
               <td>{{ c.nombre }} {{ c.apellido }}</td>
               <td>{{ c.email }}</td>
               <td class="text-end">
-                <a class="btn btn-sm btn-primary" href="#">Predecir</a>
+                <a class="btn btn-sm btn-primary" href="{% url 'predicciones:predecir_abandono' c.id %}">Predecir</a>
               </td>
             </tr>
           {% empty %}
