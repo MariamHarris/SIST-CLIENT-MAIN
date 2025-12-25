@@ -6,12 +6,52 @@
     <div>
       <h3 class="mb-0">Clientes</h3>
       <small class="text-muted">Listado de clientes registrados</small>
+      {% if stats %}
+        <div class="small text-muted mt-1">
+          Total: <strong>{{ stats.total_clientes }}</strong> ·
+          Activos: <strong>{{ stats.total_activos }}</strong> ·
+          Riesgo Alto: <strong>{{ stats.total_alto }}</strong> ·
+          Medio: <strong>{{ stats.total_medio }}</strong> ·
+          Bajo: <strong>{{ stats.total_bajo }}</strong>
+        </div>
+      {% endif %}
     </div>
     <div class="d-flex gap-2">
-      <a class="btn btn-outline-primary" href="{% url 'clientes:importar' %}">Importar</a>
-      <a class="btn btn-primary" href="{% url 'clientes:crear' %}">Nuevo</a>
+      {% if request.user.is_superuser or request.user.rol == 'admin' %}
+        <a class="btn btn-outline-primary" href="{% url 'clientes:importar' %}">Importar</a>
+        <a class="btn btn-primary" href="{% url 'clientes:crear' %}">Nuevo</a>
+      {% endif %}
     </div>
   </div>
+
+  <form method="get" class="card mb-3">
+    <div class="card-body py-2">
+      <div class="row g-2 align-items-end">
+        <div class="col-12 col-md-4">
+          <label class="form-label mb-1">Filtrar por riesgo</label>
+          <select name="riesgo" class="form-select">
+            <option value="" {% if not filtro_riesgo %}selected{% endif %}>Todos</option>
+            <option value="Alto" {% if filtro_riesgo == 'Alto' %}selected{% endif %}>Alto</option>
+            <option value="Medio" {% if filtro_riesgo == 'Medio' %}selected{% endif %}>Medio</option>
+            <option value="Bajo" {% if filtro_riesgo == 'Bajo' %}selected{% endif %}>Bajo</option>
+          </select>
+        </div>
+        <div class="col-12 col-md-4">
+          <label class="form-label mb-1">Ordenar</label>
+          <select name="orden" class="form-select">
+            <option value="" {% if not orden %}selected{% endif %}>Por defecto</option>
+            <option value="prob_desc" {% if orden == 'prob_desc' %}selected{% endif %}>Mayor probabilidad</option>
+            <option value="prob_asc" {% if orden == 'prob_asc' %}selected{% endif %}>Menor probabilidad</option>
+            <option value="nombre" {% if orden == 'nombre' %}selected{% endif %}>Nombre (A-Z)</option>
+          </select>
+        </div>
+        <div class="col-12 col-md-4 d-flex gap-2">
+          <button class="btn btn-outline-secondary" type="submit">Aplicar</button>
+          <a class="btn btn-link" href="{% url 'clientes:index' %}">Limpiar</a>
+        </div>
+      </div>
+    </div>
+  </form>
 
   <div class="card">
     <div class="card-body p-0">
@@ -23,6 +63,8 @@
               <th>Email</th>
               <th>Teléfono</th>
               <th>Estado</th>
+              <th>Riesgo</th>
+              <th class="text-end">Prob. abandono</th>
               <th class="text-end">Acciones</th>
             </tr>
           </thead>
@@ -33,13 +75,19 @@
                 <td>{{ c.email }}</td>
                 <td>{{ c.telefono|default:'-' }}</td>
                 <td>{{ c.get_estado_display }}</td>
+                <td>{{ c.nivel_riesgo }}</td>
+                <td class="text-end">{{ c.probabilidad_pct|default:0 }}%</td>
                 <td class="text-end">
-                  <a class="btn btn-sm btn-outline-secondary" href="{% url 'clientes:editar' c.pk %}">Editar</a>
-                  <a class="btn btn-sm btn-outline-danger" href="{% url 'clientes:eliminar' c.pk %}">Eliminar</a>
+                  {% if request.user.is_superuser or request.user.rol == 'admin' %}
+                    <a class="btn btn-sm btn-outline-secondary" href="{% url 'clientes:editar' c.pk %}">Editar</a>
+                    <a class="btn btn-sm btn-outline-danger" href="{% url 'clientes:eliminar' c.pk %}">Eliminar</a>
+                  {% else %}
+                    <span class="text-muted">-</span>
+                  {% endif %}
                 </td>
               </tr>
             {% empty %}
-              <tr><td colspan="5" class="text-center text-muted py-4">Sin clientes</td></tr>
+              <tr><td colspan="7" class="text-center text-muted py-4">Sin clientes</td></tr>
             {% endfor %}
           </tbody>
         </table>

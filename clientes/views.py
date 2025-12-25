@@ -36,26 +36,50 @@ def importar_clientes(request):
                 messages.error(request, "Formato de archivo no soportado.")
                 return redirect('clientes:importar')
 
+            # Normalizar nombres de columnas para validar/leer sin depender de mayúsculas/espacios
+            df.columns = [str(c).strip().lower() for c in df.columns]
+
+            required_cols = {'nombre', 'apellido', 'email'}
+            missing = sorted(required_cols - set(df.columns))
+            if missing:
+                messages.error(
+                    request,
+                    "Faltan columnas obligatorias: " + ", ".join(missing) + ". "
+                    "Columnas requeridas: nombre, apellido, email.",
+                )
+                return redirect('clientes:importar')
+
+            def _clean_str(value) -> str:
+                if value is None:
+                    return ''
+                try:
+                    if pd.isna(value):
+                        return ''
+                except Exception:
+                    pass
+                return str(value).strip()
+
             # Validación de datos
             errores = []
-            for _, row in df.iterrows():
-                email = str(row.get('email', '')).strip()
-                nombre = str(row.get('nombre', '')).strip()
-                apellido = str(row.get('apellido', '')).strip()
+            for idx, row in df.iterrows():
+                fila_num = int(idx) + 2  # +2: header(1) + 1-based row
+                email = _clean_str(row.get('email', ''))
+                nombre = _clean_str(row.get('nombre', ''))
+                apellido = _clean_str(row.get('apellido', ''))
                 
                 # Campos obligatorios
                 if not nombre or not apellido or not email:
-                    errores.append(f"Fila con email {email} tiene campos obligatorios vacíos.")
+                    errores.append(f"Fila {fila_num}: campos obligatorios vacíos (nombre/apellido/email).")
                     continue
 
                 # Validar email simple
                 if not re.match(r"[^@]+@[^@]+\.[^@]+", email):
-                    errores.append(f"Email inválido: {email}")
+                    errores.append(f"Fila {fila_num}: email inválido: {email}")
                     continue
 
                 # Evitar duplicados
                 if Cliente.objects.filter(email=email).exists():
-                    errores.append(f"Email duplicado: {email}")
+                    errores.append(f"Fila {fila_num}: email duplicado: {email}")
                     continue
 
                 # Guardar cliente
@@ -64,7 +88,7 @@ def importar_clientes(request):
                 probabilidad_abandono = 0.0
 
                 if raw_riesgo is not None:
-                    raw_riesgo_str = str(raw_riesgo).strip()
+                    raw_riesgo_str = _clean_str(raw_riesgo)
                     raw_riesgo_norm = raw_riesgo_str.lower()
 
                     if raw_riesgo_norm in {'bajo', 'medio', 'alto'}:
@@ -79,22 +103,26 @@ def importar_clientes(request):
                             if probabilidad_abandono > 1:
                                 probabilidad_abandono = 1.0
 
-                            if probabilidad_abandono < 0.3:
+                            if probabilidad_abandono < 0.33:
                                 nivel_riesgo = 'Bajo'
-                            elif probabilidad_abandono < 0.6:
+                            elif probabilidad_abandono < 0.66:
                                 nivel_riesgo = 'Medio'
                             else:
                                 nivel_riesgo = 'Alto'
                         except (TypeError, ValueError):
                             pass
 
+                estado = _clean_str(row.get('estado', 'activo')).lower() or 'activo'
+                if estado not in {'activo', 'inactivo'}:
+                    estado = 'activo'
+
                 Cliente.objects.create(
                     nombre=nombre,
                     apellido=apellido,
                     email=email,
-                    telefono=row.get('telefono', ''),
-                    direccion=row.get('direccion', ''),
-                    estado=row.get('estado', 'activo'),
+                    telefono=_clean_str(row.get('telefono', '')),
+                    direccion=_clean_str(row.get('direccion', '')),
+                    estado=estado,
                     nivel_riesgo=nivel_riesgo,
                     probabilidad_abandono=probabilidad_abandono,
                 )
@@ -115,8 +143,49 @@ def importar_clientes(request):
 @login_required
 @role_required(roles=['admin', 'analista'])
 def clientes_list(request):
-    clientes = Cliente.objects.all()
-    return render(request, 'clientes/list.html', {'clientes': clientes})
+    riesgo = (request.GET.get('riesgo') or '').strip()
+    orden = (request.GET.get('orden') or '').strip()
+
+    clientes_qs = Cliente.objects.all()
+    if riesgo in {'Bajo', 'Medio', 'Alto'}:
+        clientes_qs = clientes_qs.filter(nivel_riesgo=riesgo)
+
+    if orden == 'prob_asc':
+        clientes_qs = clientes_qs.order_by('probabilidad_abandono', 'apellido', 'nombre')
+    elif orden == 'prob_desc':
+        clientes_qs = clientes_qs.order_by('-probabilidad_abandono', 'apellido', 'nombre')
+    elif orden == 'nombre':
+        clientes_qs = clientes_qs.order_by('apellido', 'nombre')
+
+    clientes = list(clientes_qs)
+    for c in clientes:
+        try:
+            c.probabilidad_pct = round(float(c.probabilidad_abandono or 0.0) * 100.0, 1)
+        except (TypeError, ValueError):
+            c.probabilidad_pct = 0.0
+
+    total_clientes = Cliente.objects.count()
+    total_alto = Cliente.objects.filter(nivel_riesgo='Alto').count()
+    total_medio = Cliente.objects.filter(nivel_riesgo='Medio').count()
+    total_bajo = Cliente.objects.filter(nivel_riesgo='Bajo').count()
+    total_activos = Cliente.objects.filter(estado='activo').count()
+
+    return render(
+        request,
+        'clientes/list.html',
+        {
+            'clientes': clientes,
+            'filtro_riesgo': riesgo,
+            'orden': orden,
+            'stats': {
+                'total_clientes': total_clientes,
+                'total_alto': total_alto,
+                'total_medio': total_medio,
+                'total_bajo': total_bajo,
+                'total_activos': total_activos,
+            },
+        },
+    )
 
 @login_required
 @role_required(roles=['admin'])

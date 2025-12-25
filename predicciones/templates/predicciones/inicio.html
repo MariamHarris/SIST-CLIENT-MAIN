@@ -7,38 +7,51 @@
 {% block content %}
 <div class="card">
   <div class="card-body">
-    <p class="text-muted">Página de predicciones (MVP). Selecciona un cliente para generar una predicción.</p>
+    <p class="text-muted">Selecciona un cliente para generar una predicción.</p>
+
+    {% if can_train %}
+      <div class="d-flex align-items-center gap-2 mb-3">
+        <button type="button" class="btn btn-outline-primary" id="btnEntrenarModelo" data-url="{% url 'predicciones:entrenar_modelo' %}">
+          Entrenar modelo
+        </button>
+        <small class="text-muted">(Requiere que existan clientes inactivos para poder entrenar)</small>
+      </div>
+    {% endif %}
 
     <div id="prediccion-alert" class="alert d-none" role="alert"></div>
 
-    <div class="table-responsive">
-      <table class="table table-striped mb-0">
-        <thead>
-          <tr>
-            <th>Cliente</th>
-            <th>Email</th>
-            <th class="text-end">Acción</th>
-          </tr>
-        </thead>
-        <tbody>
+    <div class="row g-3">
+      <div class="col-12 col-lg-6">
+        <label class="form-label">Cliente</label>
+        <select class="form-select" id="clienteSelect">
+          <option value="">-- Selecciona un cliente --</option>
           {% for c in clientes %}
-            <tr>
-              <td>{{ c.nombre }} {{ c.apellido }}</td>
-              <td>{{ c.email }}</td>
-              <td class="text-end">
-                <button
-                  type="button"
-                  class="btn btn-sm btn-primary btn-predecir"
-                  data-url="{% url 'predicciones:calcular_riesgo' c.id %}">
-                  Predecir
-                </button>
-              </td>
-            </tr>
-          {% empty %}
-            <tr><td colspan="3" class="text-center text-muted py-4">No hay clientes para predecir</td></tr>
+            <option
+              value="{{ c.id }}"
+              data-nombre="{{ c.nombre }} {{ c.apellido }}"
+              data-email="{{ c.email }}"
+              data-estado="{{ c.get_estado_display }}"
+              data-riesgo="{{ c.nivel_riesgo }}"
+              data-prob="{{ c.probabilidad_abandono }}"
+              data-url="{% url 'predicciones:calcular_riesgo' c.id %}">
+              #{{ c.id }} - {{ c.nombre }} {{ c.apellido }}
+            </option>
           {% endfor %}
-        </tbody>
-      </table>
+        </select>
+      </div>
+
+      <div class="col-12 col-lg-6">
+        <label class="form-label">Datos del cliente</label>
+        <div class="border rounded p-3 bg-light" id="clienteInfo">
+          <div class="text-muted">Selecciona un cliente para ver sus datos.</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="mt-3">
+      <button type="button" class="btn btn-primary" id="btnPredecirSeleccionado" disabled>
+        Predecir
+      </button>
     </div>
   </div>
 </div>
@@ -48,7 +61,10 @@
 <script>
   (function () {
     const alertEl = document.getElementById('prediccion-alert');
-    const buttons = document.querySelectorAll('.btn-predecir');
+    const selectEl = document.getElementById('clienteSelect');
+    const infoEl = document.getElementById('clienteInfo');
+    const predictBtn = document.getElementById('btnPredecirSeleccionado');
+    const trainBtn = document.getElementById('btnEntrenarModelo');
 
     function showAlert(kind, text) {
       alertEl.classList.remove('d-none', 'alert-success', 'alert-danger', 'alert-warning', 'alert-info');
@@ -56,32 +72,89 @@
       alertEl.textContent = text;
     }
 
-    buttons.forEach((btn) => {
-      btn.addEventListener('click', async () => {
-        const url = btn.getAttribute('data-url');
+    function renderSelectedInfo() {
+      const opt = selectEl.options[selectEl.selectedIndex];
+      const id = opt && opt.value;
+      if (!id) {
+        predictBtn.disabled = true;
+        infoEl.innerHTML = '<div class="text-muted">Selecciona un cliente para ver sus datos.</div>';
+        return;
+      }
+
+      const nombre = opt.getAttribute('data-nombre') || '-';
+      const email = opt.getAttribute('data-email') || '-';
+      const estado = opt.getAttribute('data-estado') || '-';
+      const riesgo = opt.getAttribute('data-riesgo') || '-';
+      const probRaw = opt.getAttribute('data-prob');
+      const prob = probRaw ? (Number(probRaw) * 100).toFixed(1) : '0.0';
+
+      predictBtn.disabled = false;
+      infoEl.innerHTML = `
+        <div><strong>ID:</strong> ${id}</div>
+        <div><strong>Nombre:</strong> ${nombre}</div>
+        <div><strong>Email:</strong> ${email}</div>
+        <div><strong>Estado:</strong> ${estado}</div>
+        <div><strong>Riesgo actual:</strong> ${riesgo}</div>
+        <div><strong>Prob. abandono guardada:</strong> ${prob}%</div>
+      `;
+    }
+
+    async function predictSelected() {
+      const opt = selectEl.options[selectEl.selectedIndex];
+      const url = opt && opt.getAttribute('data-url');
+      if (!url) return;
+
+      predictBtn.disabled = true;
+      try {
+        const res = await fetch(url, { headers: { 'X-Requested-With': 'XMLHttpRequest' } });
+        const data = await res.json();
+
+        if (!res.ok) {
+          showAlert('danger', data.error || 'No se pudo calcular el riesgo');
+          return;
+        }
+
+        const cliente = data.cliente || 'Cliente';
+        const prob = data.probabilidad_abandono;
+        const nivel = data.nivel_riesgo;
+        showAlert('success', `${cliente}: ${nivel} (${prob}% prob. abandono)`);
+      } catch (e) {
+        showAlert('danger', 'Error de red al calcular el riesgo');
+      } finally {
+        predictBtn.disabled = false;
+      }
+    }
+
+    selectEl.addEventListener('change', renderSelectedInfo);
+    predictBtn.addEventListener('click', predictSelected);
+    renderSelectedInfo();
+
+    if (trainBtn) {
+      trainBtn.addEventListener('click', async () => {
+        const url = trainBtn.getAttribute('data-url');
         if (!url) return;
 
-        btn.disabled = true;
+        trainBtn.disabled = true;
         try {
           const res = await fetch(url, { headers: { 'X-Requested-With': 'XMLHttpRequest' } });
           const data = await res.json();
 
           if (!res.ok) {
-            showAlert('danger', data.error || 'No se pudo calcular el riesgo');
+            showAlert('danger', data.error || 'No se pudo entrenar el modelo');
             return;
           }
 
-          const cliente = data.cliente || 'Cliente';
-          const prob = data.probabilidad_abandono;
-          const nivel = data.nivel_riesgo;
-          showAlert('success', `${cliente}: ${nivel} (${prob}% prob. abandono)`);
+          const acc = (typeof data.accuracy === 'number') ? (data.accuracy * 100).toFixed(2) : 'N/A';
+          const precision = (typeof data.precision === 'number') ? (data.precision * 100).toFixed(2) : 'N/A';
+          const recall = (typeof data.recall === 'number') ? (data.recall * 100).toFixed(2) : 'N/A';
+          showAlert('success', `Modelo entrenado. Accuracy: ${acc}% · Precision: ${precision}% · Recall: ${recall}%`);
         } catch (e) {
-          showAlert('danger', 'Error de red al calcular el riesgo');
+          showAlert('danger', 'Error de red al entrenar el modelo');
         } finally {
-          btn.disabled = false;
+          trainBtn.disabled = false;
         }
       });
-    });
+    }
   })();
 </script>
 {% endblock %}

@@ -8,7 +8,17 @@ from clientes.models import Cliente
 @login_required
 def home(request):
     clientes = Cliente.objects.all().order_by('id')[:200]
-    return render(request, 'predicciones/inicio.html', {'clientes': clientes})
+    can_train = bool(getattr(request.user, 'is_superuser', False) or getattr(request.user, 'rol', None) == 'admin')
+    return render(
+        request,
+        'predicciones/inicio.html',
+        {
+            'clientes': clientes,
+            'can_train': can_train,
+            'page_title': 'Predicciones',
+            'page_subtitle': 'Selecciona un cliente para analizar riesgo',
+        },
+    )
 
 @login_required
 def entrenar_modelo(request):
@@ -17,9 +27,12 @@ def entrenar_modelo(request):
 
     try:
         import pandas as pd
-        from sklearn.ensemble import RandomForestClassifier
-        from sklearn.metrics import accuracy_score, classification_report, roc_auc_score
+        from sklearn.compose import ColumnTransformer
+        from sklearn.linear_model import LogisticRegression
+        from sklearn.metrics import accuracy_score, precision_score, recall_score, f1_score, roc_auc_score
         from sklearn.model_selection import train_test_split
+        from sklearn.pipeline import Pipeline
+        from sklearn.preprocessing import OneHotEncoder
         import joblib
     except ModuleNotFoundError as exc:
         return JsonResponse(
@@ -31,46 +44,64 @@ def entrenar_modelo(request):
         )
 
     
-    # 1. Preparar dataset
-    
-    clientes = Cliente.objects.all().values(
-        'estado', 'nivel_riesgo', 'telefono'  # ajusta según tus features
-    )
+    # 1) Preparar dataset
+    clientes = Cliente.objects.all().values('estado', 'nivel_riesgo', 'telefono')
     df = pd.DataFrame(clientes)
 
-    # Convertir variables categóricas si es necesario
-    df = pd.get_dummies(df, columns=['estado', 'nivel_riesgo'], drop_first=True)
+    if df.empty:
+        return JsonResponse({'error': 'No hay datos de clientes para entrenar'}, status=400)
 
-    # 2. Definir X y y (ejemplo: predecir abandono por estado)
-    # Supongamos que abandono = estado_inactivo (1) / activo (0)
-    if 'estado_inactivo' in df.columns:
-        y = df['estado_inactivo']
-        X = df.drop(columns=['estado_inactivo'])
-    else:
+    # Target: churn = 1 si estado == inactivo
+    y = (df['estado'].fillna('activo').astype(str).str.lower() == 'inactivo').astype(int)
+    if int(y.sum()) == 0:
         return JsonResponse({'error': 'No hay clientes inactivos para entrenar'}, status=400)
+
+    X = pd.DataFrame({
+        'nivel_riesgo': df.get('nivel_riesgo', 'Bajo').fillna('Bajo').astype(str),
+        'tiene_telefono': df.get('telefono', '').fillna('').astype(str).str.strip().ne('').astype(int),
+    })
 
     # 3. Separar train/test
     X_train, X_test, y_train, y_test = train_test_split(
         X, y, test_size=0.2, random_state=42
     )
 
-    # 4. Entrenar modelo
-    modelo = RandomForestClassifier(n_estimators=100, random_state=42)
+    # 4) Entrenar modelo (pipeline estable)
+    preprocessor = ColumnTransformer(
+        transformers=[
+            ('cat', OneHotEncoder(handle_unknown='ignore'), ['nivel_riesgo']),
+        ],
+        remainder='passthrough',
+    )
+    modelo = Pipeline(
+        steps=[
+            ('preprocess', preprocessor),
+            ('clf', LogisticRegression(max_iter=1000)),
+        ]
+    )
     modelo.fit(X_train, y_train)
 
-    # 5. Evaluar métricas
+    # 5) Evaluar métricas
     y_pred = modelo.predict(X_test)
-    acc = accuracy_score(y_test, y_pred)
-    report = classification_report(y_test, y_pred, output_dict=True)
-    roc = roc_auc_score(y_test, modelo.predict_proba(X_test)[:, 1])
+    y_proba = modelo.predict_proba(X_test)[:, 1]
+    acc = float(accuracy_score(y_test, y_pred))
+    precision = float(precision_score(y_test, y_pred, zero_division=0))
+    recall = float(recall_score(y_test, y_pred, zero_division=0))
+    f1 = float(f1_score(y_test, y_pred, zero_division=0))
+    try:
+        roc = float(roc_auc_score(y_test, y_proba))
+    except ValueError:
+        roc = None
 
-    # 6. Guardar modelo
+    # 6) Guardar modelo
     joblib.dump(modelo, 'predicciones/modelo_cliente.pkl')
 
     return JsonResponse({
         'accuracy': acc,
+        'precision': precision,
+        'recall': recall,
+        'f1': f1,
         'roc_auc': roc,
-        'report': report
     })
 
 
@@ -102,25 +133,13 @@ def predecir_abandono(request, cliente_id):
     except FileNotFoundError:
         return JsonResponse({'error': 'Modelo no entrenado'}, status=400)
 
-    # Preparar datos del cliente como dataframe
-    df = pd.DataFrame([{
-        'telefono': cliente.telefono,
-        'estado': cliente.estado,
-        'nivel_riesgo': cliente.nivel_riesgo,
-    }])
-
-    # Convertir variables categóricas igual que en entrenamiento
-    df = pd.get_dummies(df, columns=['estado', 'nivel_riesgo'], drop_first=True)
-
-    # Asegurarse que las columnas coincidan con el modelo
-    modelo_cols = modelo.feature_names_in_
-    for col in modelo_cols:
-        if col not in df.columns:
-            df[col] = 0
-    df = df[modelo_cols]
-
-    # Hacer predicción
-    probabilidad = modelo.predict_proba(df)[:, 1][0]
+    df = pd.DataFrame([
+        {
+            'nivel_riesgo': cliente.nivel_riesgo,
+            'tiene_telefono': 1 if (cliente.telefono or '').strip() else 0,
+        }
+    ])
+    probabilidad = float(modelo.predict_proba(df)[:, 1][0])
 
     return JsonResponse({
         'cliente': cliente.nombre,
@@ -155,29 +174,18 @@ def calcular_nivel_riesgo(request, cliente_id):
     except FileNotFoundError:
         return JsonResponse({'error': 'Modelo no entrenado'}, status=400)
 
-    # Preparar datos del cliente como dataframe
-    df = pd.DataFrame([{
-        'telefono': cliente.telefono,
-        'estado': cliente.estado,
-        'nivel_riesgo': cliente.nivel_riesgo,  # si ya existía, para consistencia
-    }])
-
-    df = pd.get_dummies(df, columns=['estado', 'nivel_riesgo'], drop_first=True)
-
-    # Asegurarse que las columnas coincidan con el modelo
-    modelo_cols = modelo.feature_names_in_
-    for col in modelo_cols:
-        if col not in df.columns:
-            df[col] = 0
-    df = df[modelo_cols]
-
-    # Predicción
+    df = pd.DataFrame([
+        {
+            'nivel_riesgo': cliente.nivel_riesgo,
+            'tiene_telefono': 1 if (cliente.telefono or '').strip() else 0,
+        }
+    ])
     probabilidad = float(modelo.predict_proba(df)[:, 1][0])
 
     # Calcular nivel de riesgo
-    if probabilidad < 0.3:
+    if probabilidad < 0.33:
         nivel = "Bajo"
-    elif probabilidad < 0.6:
+    elif probabilidad < 0.66:
         nivel = "Medio"
     else:
         nivel = "Alto"
